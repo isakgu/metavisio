@@ -2,18 +2,26 @@
 <html lang="en">
 
     <head>
-        <title>metavisuo</title>
+        <title>MetaVisuo</title>
         <meta charset="UTF-8">
         <link rel="stylesheet" href="metavisuo.css"/>
         
         <script type="module">
+            //
+            //Get the metavisuo applicatiion class
             import {metavisuo} from "./metavisuo.js";
             //
-            //Create a metavisuo object
-            const meta = new metavisuo();
-            //
-            //Show the metavisuo object
-            meta.show_panels();
+            window.onload = async ()=>{
+                //
+                //Create a metavisuo  page
+                const page = new metavisuo();
+                //
+                //Let the page be accessible outside of this class
+                window.page = page;
+                //
+                //Show the metavisuo object
+                await page.show_panels();
+            };
         </script>
 
     </head>
