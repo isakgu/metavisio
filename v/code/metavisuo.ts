@@ -1048,7 +1048,7 @@ class attribute extends schema.column{
         //Get a class list to support giving this attribute different appearances
         const list:DOMTokenList = this.proxy.classList;
 
-        //Mark attributes that have  errors
+        //Mark attributes that have errors
         if (this.errors.length>0) list.add('error');
         //
         //Mark attributes whose usage is mandatory
