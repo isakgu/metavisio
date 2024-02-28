@@ -90,7 +90,7 @@ export class metaerror extends metavisuo {
     // Get the entities in the datanase
     const entities: { [index: string]: entity } = database.entities;
     //
-    //Get teh selected entity element
+    //Get the selected entity element
     const element:HTMLElement|null = this.document.querySelector('.selected');
     //
     //Abort this process if there is no selection

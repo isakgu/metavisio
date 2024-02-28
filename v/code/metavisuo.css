@@ -1,4 +1,4 @@
- html {
+html {
     height: 100%;
 }
 
@@ -6,7 +6,7 @@ body {
     height: 100%;
     display: grid;
     grid-template-rows: 10% 90%;
-    grid-template-areas: "header" "content"; 
+    grid-template-areas: 'header' 'content';
 }
 
 #header {
@@ -15,7 +15,7 @@ body {
 }
 
 #content {
-    grid-area:content;
+    grid-area: content;
 }
 
 /*
@@ -29,53 +29,62 @@ Styling for all svg texts, e.g., entity names, attribute labels etc*/
 text {
     font-size: 2px;
     font-family: Arial, Helvetica, sans-serif;
-    stroke:black;
-    stroke-width:0.1px;
+    stroke: black;
+    stroke-width: 0.1px;
 }
 
 /*
 The color for all normal entities*/
-circle{fill: lightblue}
+circle {
+    fill: lightblue;
+}
 
 /*
 The red color for erroneous entities and text*/
-.error circle{
-    fill:#f7a886;
+.error circle {
+    fill: #f7a886;
 }
-.error text{
-    text:white;
+.error text {
+    text: white;
     -webkit-text-stroke-color: white;
 }
 
 /*
 The color of a selected*/
-.selected circle{
+.selected circle {
     fill: rgb(189, 135, 222);
 }
 
 /*
 Mandatory vs optional*/
-.mandatory {fill:rgb(5, 250, 21)}    
+.mandatory {
+    fill: rgb(252, 8, 232);
+    text-decoration: underline;
+    font-style: italic;
+}
 
 /*
 The attribute's' backbone
 */
-.backbone{
-    stroke:black;
+.backbone {
+    stroke: black;
     stroke-width: 0.1;
 }
 
 /*
 The markers for the attributes backbone. THIS IS NOT WORKING*/
 
-marker{
-    stroke:black;
+marker {
+    stroke: black;
     stroke-width: 2;
 }
 
-
-.relation polyline{
-    stroke:black;
+.relation polyline {
+    stroke: black;
     stroke-width: 0.2;
 }
 
+/* Hide and unhide content in the page */
+.hidden {
+    display: none;
+}

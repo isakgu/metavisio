@@ -1,10 +1,10 @@
 //Import schema as a namespace (rather than the individual components) so that
-//we can define extended versions of the same components in a separate (metavisuo) 
+//we can define extended versions of the same components in a separate (metavisuo)
 //namespace
-import * as schema from "../../../schema/v/code/schema.js";
-import {myalert, page, svgns} from "../../../outlook/v/code/view.js";
-import {exec} from "../../../schema/v/code/server.js"
-import {label} from "../../../schema/v/code/questionnaire.js";
+import * as schema from '../../../schema/v/code/schema.js';
+import { myalert, page, svgns } from '../../../outlook/v/code/view.js';
+import { exec } from '../../../schema/v/code/server.js';
+import { label } from '../../../schema/v/code/questionnaire.js';
 
 //The metavisouo application class
 export class metavisuo extends page {
@@ -14,27 +14,24 @@ export class metavisuo extends page {
     //
     //A database selector
     private selector?: HTMLSelectElement;
-    // 
+    //
     //class constructor.
     constructor() {
         super();
     }
 
     //
-    //Generate the structure from the given named database among the list of all 
+    //Generate the structure from the given named database among the list of all
     //available databases and draw its visual structure
     async create_metadb(dbname: string): Promise<database> {
         //
         //Generate an Idatabase structure for the selected database. Ensure that
-        //a complete database is generated and that no exceptions should be 
+        //a complete database is generated and that no exceptions should be
         //thrown if the datanase has a problem
-        const structure: 
-        
-        
-        schema.Idatabase = await exec(
-            "database", 
-            [dbname, true, false], 
-            "export_structure", 
+        const structure: schema.Idatabase = await exec(
+            'database',
+            [dbname, true, false],
+            'export_structure',
             []
         );
         //
@@ -48,18 +45,20 @@ export class metavisuo extends page {
         return new database(content, dbase);
     }
     //
-    //Populate the selector designated to hold all the named databases on 
+    //Populate the selector designated to hold all the named databases on
     //this server and return the selector
     populate_selector(databases: Array<string>): HTMLSelectElement {
         //
         //Get the selector element
-        const selector = <HTMLSelectElement> this.get_element("databases");
+        const selector = <HTMLSelectElement>this.get_element('databases');
         //
         //For each database name create a selector option and add it to the selector
-        databases.forEach(dbname => this.create_element("option", selector, {
-            textContent: dbname,
-            value: dbname
-        }));
+        databases.forEach((dbname) =>
+            this.create_element('option', selector, {
+                textContent: dbname,
+                value: dbname,
+            })
+        );
         //
         //Return teh selector
         return selector;
@@ -70,8 +69,7 @@ export class metavisuo extends page {
         //
         //Extract all database names  except mysql, performance_schema,phpmyadmin
         //sys, and information schema
-        const sql:string = 
-            `select 
+        const sql: string = `select 
                 schema_name as dbname 
             from 
                 information_schema.schemata
@@ -84,20 +82,20 @@ export class metavisuo extends page {
                     'phpmyadmin'
                 )
             order by schema_name    
-            `
+            `;
         //
         //Retrieve the names
-        const dbases: Array<{dbname: string}> = await exec(
-            "database", 
-            ["information_schema"], 
-            "get_sql_data", 
+        const dbases: Array<{ dbname: string }> = await exec(
+            'database',
+            ['information_schema'],
+            'get_sql_data',
             [sql]
         );
         //
         //Compile and return the list
-        return dbases.map(db=>db.dbname);
+        return dbases.map((db) => db.dbname);
     }
-    // 
+    //
     //Show the panels of metavisuo
     //On load, get all databases on this server, populate the selector and pick
     //the first database
@@ -107,7 +105,10 @@ export class metavisuo extends page {
         const dbnames: Array<string> = await this.get_dbnames();
         //
         //Alert the user (and discontinue this show) if there are no databases
-        if (dbnames.length === 0) {alert('No databases are found');return}
+        if (dbnames.length === 0) {
+            alert('No databases are found');
+            return;
+        }
         //
         //Populate the database selector
         this.selector = this.populate_selector(dbnames);
@@ -123,14 +124,14 @@ export class metavisuo extends page {
     }
 
     //On selecting a database, show it; then save it to the local storage for
-    //use as the next databse when we refresh the page 
+    //use as the next databse when we refresh the page
     private async show_dbase(): Promise<void> {
         //
         //Remove the current database, if any
         if (this.current_db !== undefined) this.current_db.hook.removeChild(this.current_db.proxy);
         //
-        //Get the selected database name. For you to get here, there must be one. 
-        const dbname: string = this.get_selected_value("databases");
+        //Get the selected database name. For you to get here, there must be one.
+        const dbname: string = this.get_selected_value('databases');
         //
         //Save the selected database to the local storage for future references
         window.localStorage['last_dbase'] = dbname;
@@ -138,22 +139,21 @@ export class metavisuo extends page {
         //Get the named metavisuo database -- an extension of the schema.database --
         //and make it the current one.
         this.current_db = await this.create_metadb(dbname);
-                //
+        //
         //Show all the the entities and their relationships
         await this.current_db.show();
     }
-
 }
 
 //A metavisual database extends the schema version
-export class database extends schema.database{
+export class database extends schema.database {
     //
     //The entities of the current application database.
-    public entities: {[index: string]: entity};
+    public entities: { [index: string]: entity };
     //
     //Collection of (unindexed) relatons for between all the entities
     public relations: Array<relation>;
-    // 
+    //
     //Set the view box properties.
     //
     //Set the panning attributes of a view box.
@@ -164,50 +164,50 @@ export class database extends schema.database{
     public zoomx: number = 128;
     public zoomy: number = 64;
 
-    public proxy:SVGElement;
+    public proxy: SVGElement;
     //
     //The database name that holds the metadata; its either this database -- if
     //the metadata is embeded, or the standalone metavisuo database
-    get  meta_dbname():string{
+    get meta_dbname(): string {
         //
-        //Set the database that contains the metata. It's either this one, if 
+        //Set the database that contains the metata. It's either this one, if
         //the metadata subsystem are embedded, or the external one, metavisuo
-        return this.entities['dbase']===undefined  ? 'metavisuo':this.name;
-    };
-    // 
+        return this.entities['dbase'] === undefined ? 'metavisuo' : this.name;
+    }
+    //
     //class constructor.
     constructor(
         //The HTML tag where to hook the svg element for this database
         public hook: HTMLElement,
         //
         //The schema database that is the extension of this meta-visuo version is
-        //the one to which  
+        //the one to which
         public dbase: schema.database
     ) {
-        //A database is the highest object in the matavisuo hierarchy and 
+        //A database is the highest object in the matavisuo hierarchy and
         //therefore has no parent
         super(dbase.static_dbase);
         //
         //Prepare to set the SVG element
-        // 
-        //Create the svg element in our content element in the html file. 
+        //
+        //Create the svg element in our content element in the html file.
         //N.B. The schema class uses a getter to make this element available
-        //to all the children of a database, i.e., entities, attrbutes and relations 
-        this.proxy = this.document.createElementNS(svgns, "svg");
+        //to all the children of a database, i.e., entities, attrbutes and relations
+        this.proxy = this.document.createElementNS(svgns, 'svg');
         //
         //Attach the svg to the hook.
         hook.appendChild(this.proxy);
         //
         //Add an event listener for moving the entity group to the double clicked position.
         this.proxy.ondblclick = (ev) => this.entity_move(ev);
-        // 
+        //
         //Add the view box attribute, based on the zoom and pan settings.
-        this.proxy.setAttribute("viewBox", `${[this.panx, this.pany, this.zoomx, this.zoomy]}`);
+        this.proxy.setAttribute('viewBox', `${[this.panx, this.pany, this.zoomx, this.zoomy]}`);
         //
         //Add the zooom out event listener to the zoom_out button
         this.get_element('zoom_out').onclick = () => this.zoom('out');
         this.get_element('zoom_in').onclick = () => this.zoom('in');
-        // 
+        //
         //Add the pan_left,pan_right,pan_up and pan_down event listener button.
         this.get_element('pan_left').onclick = () => this.pan('left');
         this.get_element('pan_right').onclick = () => this.pan('right');
@@ -219,24 +219,23 @@ export class database extends schema.database{
         //
         //Pan the documents in view, depending on the selected keys
         //Add a test key press event
-        onkeydown = (ev)=>this.pan_with_keys(ev); 
-         //
+        onkeydown = (ev) => this.pan_with_keys(ev);
+        //
         //Create the meta-visuo entities
         this.entities = this.create_entities(dbase);
         //
-        //Create and collect the meta_visuo relations 
+        //Create and collect the meta_visuo relations
         this.relations = [...this.collect_relations(dbase)];
         //
         //Create arrow markers, e.g., the crawfoot for relationships,
         this.create_markers();
-       
     }
 
     //
     //Show all the entities and their relationships by moving them to their
     //respective positions. N.B. These schema objects were drawn when they were
     //constructed.
-    async show():Promise<void>{
+    async show(): Promise<void> {
         //
         //Load the position data for the entities from the database
         await this.load_x_y_positions();
@@ -248,16 +247,24 @@ export class database extends schema.database{
         // designated positions
         for (const ename in this.entities) this.entities[ename].move();
     }
-    
+
     //Pan using the keyboard
     pan_with_keys(event: KeyboardEvent): void {
         //
         //Use the event code to pan
         switch (event.code) {
-            case "ArrowRight": this.pan('right'); break;
-            case "ArrowLeft": this.pan('left'); break;
-            case "ArrowUp": this.pan('up'); break;
-            case "ArrowDown": this.pan('down'); break;
+            case 'ArrowRight':
+                this.pan('right');
+                break;
+            case 'ArrowLeft':
+                this.pan('left');
+                break;
+            case 'ArrowUp':
+                this.pan('up');
+                break;
+            case 'ArrowDown':
+                this.pan('down');
+                break;
             default:
         }
     }
@@ -266,89 +273,94 @@ export class database extends schema.database{
     create_markers(): void {
         //
         //Define the marker paths
-        const paths:{[key:string]:string}= {
+        const paths: { [key: string]: string } = {
             //
-            foot_optional:              'M 30 32, L-18 32,M 10 22, L 30 22 M 10 42, L 30 42 M 10 22 L 10 42',
+            foot_optional: 'M 30 32, L-18 32,M 10 22, L 30 22 M 10 42, L 30 42 M 10 22 L 10 42',
             //
-            foot_optional_identifier:   'M 30 32, L-18 32,M 10 22, L 30 22 M 10 42, L 30 42 M 10 22 L 10 42,M -7 16 L-16 42.6 M -32 -2 L-4.5 42.6',
+            foot_optional_identifier:
+                'M 30 32, L-18 32,M 10 22, L 30 22 M 10 42, L 30 42 M 10 22 L 10 42,M -7 16 L-16 42.6 M -32 -2 L-4.5 42.6',
             //
-            foot_manda_identifier:  'M 30 32, L-18 32,M 10 22, L 30 22 M 10 42, L 30 42 M 10 22 L 10 42,M 1 16 L1 44 M -7 16 L-16 42.6 M -32 -2 L-4.5 42.6',
+            foot_manda_identifier:
+                'M 30 32, L-18 32,M 10 22, L 30 22 M 10 42, L 30 42 M 10 22 L 10 42,M 1 16 L1 44 M -7 16 L-16 42.6 M -32 -2 L-4.5 42.6',
             //
-            foot_mandatory:         'M 30 32, L-18 32,M 10 22, L 30 22 M 10 42, L 30 42 M 10 22 L 10 42,M 1 16 L1 44 ',
-            //        
-            tick:'M 30 30 L 30 44',
+            foot_mandatory:
+                'M 30 32, L-18 32,M 10 22, L 30 22 M 10 42, L 30 42 M 10 22 L 10 42,M 1 16 L1 44 ',
             //
-            arrow:'M 8 8 L 0 4 L 0 12'
+            tick: 'M 30 30 L 30 44',
+            //
+            arrow: 'M 8 8 L 0 4 L 0 12',
         };
         //
         //Group all the markers together
-        const g = <SVGElement> document.createElementNS(svgns, "g");
+        const g = <SVGElement>document.createElementNS(svgns, 'g');
         g.classList.add('markers');
         this.proxy.appendChild(g);
         //
         //Draw the marker corresponding to each path
-        for(const key in paths) this.draw_marker(key, paths[key], g)
+        for (const key in paths) this.draw_marker(key, paths[key], g);
     }
     //
     //Draw the named marker using the given path
-    draw_marker(key:string, path_str:string, g:SVGElement):void{
+    draw_marker(key: string, path_str: string, g: SVGElement): void {
         //
         //DRAW THE LINE  MARKER
         // Create the marker element for the attributes.
-        const marker: SVGMarkerElement = <SVGMarkerElement> document.createElementNS(svgns, "marker");
-        // 
+        const marker: SVGMarkerElement = <SVGMarkerElement>(
+            document.createElementNS(svgns, 'marker')
+        );
+        //
         //Attach the marker to the group tag
         g.appendChild(marker);
-        // 
+        //
         // Supply the marker attributes
         //
         //Define the marker view box
         const panx: number = -20;
         const pany: number = -20;
-        // 
-        //Set the width of the viewport into which the <marker> is to be fitted when it is 
+        //
+        //Set the width of the viewport into which the <marker> is to be fitted when it is
         //rendered according to the viewBox
         const realx: number = 64;
-        // 
-        //Set the height of the viewport into which the <marker> is to be fitted when it is 
-        //rendered according to the viewBox 
+        //
+        //Set the height of the viewport into which the <marker> is to be fitted when it is
+        //rendered according to the viewBox
         const realy: number = 64;
         //
         //Marker size (pixels)
         //Set the height of the marker
         const markerHeight: number = 5;
-        // 
+        //
         //Set the width of the marker
         const markerWidth: number = 5;
         //
         //Set the marker view box
-        marker.setAttribute("viewBox", `${[panx, pany, realx, realy]}`);
+        marker.setAttribute('viewBox', `${[panx, pany, realx, realy]}`);
         //
         //Set the name of the marker
-        marker.setAttribute("id", key);
+        marker.setAttribute('id', key);
         //
         //Set the reference point for the marker to be the center of the viewbox
         //Define the x coordinate of the marker referencing point
-        marker.setAttribute("refX", `${0.5 * realx}`);
-        // 
-        //Define the y coordinate of the marker referencing point
-        marker.setAttribute("refY", `${0.5 * realy}`);
-        marker.setAttribute("markerWidth", `${markerWidth}`);
-        marker.setAttribute("markerHeight", `${markerHeight}`);
+        marker.setAttribute('refX', `${0.5 * realx}`);
         //
-        marker.setAttribute("orient", "auto-start-reverse");
+        //Define the y coordinate of the marker referencing point
+        marker.setAttribute('refY', `${0.5 * realy}`);
+        marker.setAttribute('markerWidth', `${markerWidth}`);
+        marker.setAttribute('markerHeight', `${markerHeight}`);
+        //
+        marker.setAttribute('orient', 'auto-start-reverse');
         //
         //Trace the path that defines this marker
-        const path_element: SVGPathElement = this.document.createElementNS(svgns, "path");
+        const path_element: SVGPathElement = this.document.createElementNS(svgns, 'path');
         path_element.setAttribute('d', path_str);
         path_element.classList.add('chickenfoot');
-        
+
         //Let teh marker scale with the stroke width
         //marker.setAttribute("markerUnits", "strokeWidth");
         //
         //Try this option
-        marker.setAttribute("markerUnits", "userSpaceOnUse");
-        // 
+        marker.setAttribute('markerUnits', 'userSpaceOnUse');
+        //
         // Attach the line marker to the marker element
         marker.appendChild(path_element);
     }
@@ -357,24 +369,24 @@ export class database extends schema.database{
     //by some fixed percentage, say 10%
     zoom(dir: 'in' | 'out'): void {
         //
-        // 
+        //
         const sign = dir === 'in' ? +1 : -1;
         //
         //Change the database zooms
-        this.zoomx = this.zoomx + sign * this.zoomx * 10 / 100;
-        this.zoomy = this.zoomy + sign * this.zoomy * 10 / 100;
+        this.zoomx = this.zoomx + (sign * this.zoomx * 10) / 100;
+        this.zoomy = this.zoomy + (sign * this.zoomy * 10) / 100;
         //
-        this.proxy.setAttribute("viewBox", `${[this.panx, this.pany, this.zoomx, this.zoomy]}`);
+        this.proxy.setAttribute('viewBox', `${[this.panx, this.pany, this.zoomx, this.zoomy]}`);
     }
-    // 
+    //
     //
     pan(dir: 'up' | 'left' | 'right' | 'down'): void {
         //
         //Determine x, the amount by which to pan x, as 5% of 132
-        const x = 5 / 100 * 132;
+        const x = (5 / 100) * 132;
         //
         //Detemine y,the amount by which to pan y, as 5% of 64
-        const y = 5 / 100 * 64;
+        const y = (5 / 100) * 64;
         //
         //Determine the pan direction and make the necessary pan
         //property changes
@@ -388,14 +400,14 @@ export class database extends schema.database{
                 if (this.pany > 50) {
                     //
                     //Alert the user that the document might be getting out of view
-                    alert("This document is out of view, move down or zoom out to view it");
+                    alert('This document is out of view, move down or zoom out to view it');
                     //
                     //Prevent the user from moving further out of view
                     return;
                 }
                 break;
             case 'down':
-                //    
+                //
                 //Change pany y with some negative amount (y)
                 this.pany = this.pany - y;
                 //
@@ -403,7 +415,7 @@ export class database extends schema.database{
                 if (this.pany < -50) {
                     //
                     //Alert the user that the document might be getting out of view
-                    alert("This document is out of view, move up or zoom out to view it");
+                    alert('This document is out of view, move up or zoom out to view it');
                     //
                     //Prevent the user from moving further out of view
                     return;
@@ -419,7 +431,7 @@ export class database extends schema.database{
                 if (this.panx > 50) {
                     //
                     //Alert the user that the document might be getting out of view
-                    alert("This document is out of view, move right or zoom out to view it");
+                    alert('This document is out of view, move right or zoom out to view it');
                     //
                     //Prevent the user from moving further out of view
                     return;
@@ -433,28 +445,27 @@ export class database extends schema.database{
                 if (this.panx < -50) {
                     //
                     //Alert the user that the document might be getting out of view
-                    alert("This document is out of view, move left or zoom out to view it");
+                    alert('This document is out of view, move left or zoom out to view it');
                     //
                     //Prevent the user from moving further out of view
                     return;
                 }
                 // this.panx +=x;
-                break
+                break;
         }
         //
         //Effect the changes
-        this.proxy.setAttribute("viewBox", `${[this.panx, this.pany, this.zoomx, this.zoomy]}`);
-
+        this.proxy.setAttribute('viewBox', `${[this.panx, this.pany, this.zoomx, this.zoomy]}`);
     }
 
     //Create the metavisuo entiies
-    create_entities(dbase: schema.database): {[index: string]: entity} {
+    create_entities(dbase: schema.database): { [index: string]: entity } {
         //
         //Start with an empty collection of entites
-        const entities: {[index: string]: entity} = {};
+        const entities: { [index: string]: entity } = {};
         //
         //
-        //Loop over all schema entities and convert them to metavisuo versions, saving and 
+        //Loop over all schema entities and convert them to metavisuo versions, saving and
         //drawing them at the same time
         for (const ename in dbase.entities) {
             //
@@ -496,13 +507,13 @@ export class database extends schema.database{
         //The name of teh databse
         yield [this.name, 'dbase', 'name'];
         //
-        //Save the current pan and zoom values to the 
+        //Save the current pan and zoom values to the
         yield [this.panx, 'dbase', 'pan_x'];
         yield [this.pany, 'dbase', 'pan_y'];
         yield [this.zoomx, 'dbase', 'zoom_x'];
         yield [this.zoomy, 'dbase', 'zoom_y'];
         //
-        //For each entity, generate labels for saving the x/y cordinates 
+        //For each entity, generate labels for saving the x/y cordinates
         for (const key in this.entities) {
             //
             //Get the entity
@@ -514,16 +525,16 @@ export class database extends schema.database{
         }
     }
 
-    // 
-    //Draw the database entities and relations (as part of the database 
+    //
+    //Draw the database entities and relations (as part of the database
     //construction)
     async draw(): Promise<void> {
         //
         //Draw the entities
         for (const ename in this.entities) this.entities[ename].draw();
-        // 
+        //
         //Draw the relationship asociatd with this entity.
-        this.relations.forEach(Relation => Relation.draw());
+        this.relations.forEach((Relation) => Relation.draw());
     }
 
     //Load the entities' x and y coordinates from the metavisuo database
@@ -532,8 +543,7 @@ export class database extends schema.database{
         //Set the x and y coordinates
         //
         //Compile the sql for reading x/y cooedinates from schema dbase
-        const sql: string =
-            `select
+        const sql: string = `select
                 entity.name,
                 entity.x,
                 entity.y
@@ -542,18 +552,19 @@ export class database extends schema.database{
                 inner join dbase on entity.dbase = dbase.dbase
              where
                 dbase.name = '${this.name}'   
-            `
+            `;
         //
-        //Retrieve the data 
-        const result: Array<{name: string, x: number, y: number}> = await exec
-        ('database', 
-        [this.meta_dbname], 
-        'get_sql_data', 
-        [sql]);
+        //Retrieve the data
+        const result: Array<{ name: string; x: number; y: number }> = await exec(
+            'database',
+            [this.meta_dbname],
+            'get_sql_data',
+            [sql]
+        );
         //
         //Use the result to set the x and y coordinates for the matching entity
         //in this database
-        result.forEach(row => {
+        result.forEach((row) => {
             //
             //Get the named entity
             const entity = this.entities[row.name];
@@ -561,18 +572,18 @@ export class database extends schema.database{
             //If the entity is not found, then the schema datanase may need
             //a clean up. In future, we will alert the user to clean the schema
             //database. For this version, we ignore the result.
-            if (!entity) return;  
+            if (!entity) return;
             //
             //Continue to set the coordinates
             entity.position.x = row.x;
-            entity.position.y = row.y
+            entity.position.y = row.y;
         });
     }
     //
-    //Loop over all metavisuo entities and focus on the foreign keys. For each 
+    //Loop over all metavisuo entities and focus on the foreign keys. For each
     //key that is does notpoint to an external database, collect it as a relation
     *collect_relations(dbase: schema.database): Generator<relation> {
-        // 
+        //
         //For each metavisuo entity step throug all her columns
         for (const ename in dbase.entities) {
             //
@@ -581,7 +592,7 @@ export class database extends schema.database{
             //
             //Get the columns of the entity as an array
             const columns: Array<schema.column> = Object.values(entity.columns);
-            // 
+            //
             //For each foreign key that is pointing to an entity in this database
             //external, collect it as a relatioon
             for (const col of columns) {
@@ -601,15 +612,15 @@ export class database extends schema.database{
             }
         }
     }
-    
-    // 
+
+    //
     //Move the selected entity to the double-clicked position
     entity_move(ev: MouseEvent): void {
         //
         //Get the selected entity
         //
         //Get the group that corresponds to the selected entity
-        const group = <SVGGraphicsElement | null> this.proxy.querySelector('.selected');
+        const group = <SVGGraphicsElement | null>this.proxy.querySelector('.selected');
         //
         //If there is no selection then discontinue the move
         if (group === null) return;
@@ -620,8 +631,8 @@ export class database extends schema.database{
         //Get the named entity
         const entity: entity = this.entities[ename];
         //
-        //Get the coordinates of the double-clicked position (in real units). 
-        //The grop element provided access to the CTM. Could we have gotten it 
+        //Get the coordinates of the double-clicked position (in real units).
+        //The grop element provided access to the CTM. Could we have gotten it
         //using this.svg Element?
         entity.position = this.entity_get_new_position(ev, group);
         //
@@ -629,23 +640,23 @@ export class database extends schema.database{
         entity.move();
     }
 
-    // 
-    //Get the coordinates of the double-clicked position (in real units), given 
+    //
+    //Get the coordinates of the double-clicked position (in real units), given
     //the event generated by the event.
     entity_get_new_position(ev: MouseEvent, element: SVGGraphicsElement): DOMPoint {
         //
-        //Get the mouse coordinates (in pixels) where the clicking occured on 
-        //the canvas. 
+        //Get the mouse coordinates (in pixels) where the clicking occured on
+        //the canvas.
         const x: number = ev.clientX;
         const y: number = ev.clientY;
         //
-        //Convert the mouse pixel coordinates to the real world coordinates, 
+        //Convert the mouse pixel coordinates to the real world coordinates,
         //given our current viewbox
         //
         //Use the x and y pixels to define an svg point
         const point_old: DOMPoint = new DOMPoint(x, y);
         //
-        //N.B. There are 2 methods for getting Client Transformatiom Matrices, 
+        //N.B. There are 2 methods for getting Client Transformatiom Matrices,
         //viz., sceermCTM and clientCTM. After our investigaion, the screen one
         //(contrary to our expectation) gave the correct result. Why????
         const ctm: DOMMatrix | null = element.getScreenCTM();
@@ -667,27 +678,27 @@ export class database extends schema.database{
 type component = {
     //
     //The circle tha represents the entity
-    circle:SVGCircleElement;
+    circle: SVGCircleElement;
     //
     //The name of the entity
-    text:SVGTextElement;
+    text: SVGTextElement;
     //
     //The attributes sub-components
-    attributes:{
+    attributes: {
         //
         //The rotatable group of atribute componnets
-        rotatable:SVGElement;
+        rotatable: SVGElement;
         //
         //The backbone with tickmarks for hooking attrobute texts
-        polyline:SVGPolylineElement;
+        polyline: SVGPolylineElement;
         //
         //The group of text tables whole margin can joinly be controlled
-        margin:SVGElement
-    }    
-}
-// 
+        margin: SVGElement;
+    };
+};
+//
 //The entity in the meta-visuo namespace is an extension of the schema version
-export class entity extends schema.entity{
+export class entity extends schema.entity {
     //
     //The position of this entity in the e-a-r drawing
     public position: DOMPoint;
@@ -699,22 +710,26 @@ export class entity extends schema.entity{
     angle: number = 0;
     //
     //The visual dimension of this entity
-    proxy:SVGGraphicsElement;
+    proxy: SVGGraphicsElement;
     //
     //The attributes of this entity
     attributes: Array<attribute>;
     //
     //The place holder for collected relations connected to this entity. N.B.
     //Relations cannot be determined when an entity is being constructted.
-    private __relations?:Array<relation>;
+    private __relations?: Array<relation>;
     //
     //The components of an entity
-    public component:component;
+    public component: component;
     //
     //Direct access to this entity's position
-    get x():number{return this.position.x; }
-    get y():number{return this.position.y; }
-    
+    get x(): number {
+        return this.position.x;
+    }
+    get y(): number {
+        return this.position.y;
+    }
+
     //
     constructor(
         //
@@ -725,15 +740,15 @@ export class entity extends schema.entity{
         public name: string,
         //
         //The center of the circle that represents this entity. If the coordinates
-        //are not known, random values will be used 
-        position?: DOMPoint,
+        //are not known, random values will be used
+        position?: DOMPoint
     ) {
         //
-        //The (visual) parent of an entity is a database 
+        //The (visual) parent of an entity is a database
         super(dbase, name);
-        // 
-        // Create the entity group tag that represents its visual aspect 
-        this.proxy = this.document.createElementNS(svgns, "g");
+        //
+        // Create the entity group tag that represents its visual aspect
+        this.proxy = this.document.createElementNS(svgns, 'g');
         //
         //Mark this as an entity
         this.proxy.classList.add('entity');
@@ -742,19 +757,17 @@ export class entity extends schema.entity{
         this.proxy.id = this.name;
         //
         //If there are errors in this  entity mark it as such
-        if (this.errors.length>0) this.proxy.classList.add('error');
+        if (this.errors.length > 0) this.proxy.classList.add('error');
         //
-        //Attach this proxy to that of the database to establish the visual 
+        //Attach this proxy to that of the database to establish the visual
         //relationship
         this.dbase.proxy.appendChild(this.proxy);
         //
         //Set the x and y value to to either the given values or a random number
-        this.position = position ?? new DOMPoint (
-            dbase.zoomx * Math.random(), 
-            dbase.zoomy * Math.random()
-        );
+        this.position =
+            position ?? new DOMPoint(dbase.zoomx * Math.random(), dbase.zoomy * Math.random());
         //
-        //Draw this entity's componets (before creating entities). N.B. Draw 
+        //Draw this entity's componets (before creating entities). N.B. Draw
         //happens once; move happens many times
         this.component = this.draw();
         //
@@ -762,29 +775,27 @@ export class entity extends schema.entity{
         //to an external database)
         this.attributes = [...this.collect_attributes()];
         //
-        //Set te atttributes index, after creation. This was deferred to this 
+        //Set te atttributes index, after creation. This was deferred to this
         //point so that pointers to external databases can be considerd as equal
         //attributes. Otherwise thoer positioning would be problematic
-        this.attributes.forEach((attribute, i)=>attribute.index=i);
+        this.attributes.forEach((attribute, i) => (attribute.index = i));
         //
-        //Add an event listener such that when this entity is clicked on, the 
-        //selection is  removed from any other entity that is selected and this 
+        //Add an event listener such that when this entity is clicked on, the
+        //selection is  removed from any other entity that is selected and this
         //one
         this.proxy.onclick = () => this.select();
-        
     }
 
-    //The relations of this entity are those that have it --this entity--as 
+    //The relations of this entity are those that have it --this entity--as
     //its both the source and the destination.
-    *collect_relations():Generator<relation>{
+    *collect_relations(): Generator<relation> {
         //
         //Visit all the relations of this database
-        for (const relation of this.dbase.relations) 
-        yield *this.collect_relation(relation);
+        for (const relation of this.dbase.relations) yield* this.collect_relation(relation);
     }
-    
+
     //Returns the relations of this entity. They are constructed only once.
-    get relations():Array<relation>{
+    get relations(): Array<relation> {
         //
         //Return the relations if they are defined
         if (this.__relations) return this.__relations;
@@ -795,29 +806,29 @@ export class entity extends schema.entity{
         return this.__relations;
     }
 
-    //Collect the given relation if this entity is either its source or its 
+    //Collect the given relation if this entity is either its source or its
     //destination
-    *collect_relation(relation:relation):Generator<relation>{
+    *collect_relation(relation: relation): Generator<relation> {
         //
         //Collect the given relation if this entity is its source
         if (relation.src === this) yield relation;
         //
         //Collect the given relation if this entity is its destination
-        if (relation.dest===this) yield relation;
+        if (relation.dest === this) yield relation;
     }
-    
+
     //Collect the attributes of this entity
-    *collect_attributes():Generator<attribute>{
+    *collect_attributes(): Generator<attribute> {
         //
         ///Loop through all the columns of this entity
-        for (const col of  Object.values(this.columns)){
+        for (const col of Object.values(this.columns)) {
             //
             //Consider ordinary attributes
             if (col instanceof schema.attribute) yield new attribute(this, col);
             //
             //Consider foreign key columns tha point to external entities, i.e.,
             //those that are in the same database as this entity
-            if (col instanceof schema.foreign && col.ref.dbname!==col.entity.dbase.name){
+            if (col instanceof schema.foreign && col.ref.dbname !== col.entity.dbase.name) {
                 //
                 //Use tey column to create an attribute
                 const attr = new attribute(this, col);
@@ -830,8 +841,7 @@ export class entity extends schema.entity{
         }
     }
 
-    
-    //Draw this entity as a circle with its attributes slanted at some angle. 
+    //Draw this entity as a circle with its attributes slanted at some angle.
     //This is the arrange layout of the tags:-
     /*
     <g class="entity">....the proxy element
@@ -847,35 +857,35 @@ export class entity extends schema.entity{
     draw(): component {
         //
         //1. Draw the circle of the entity and return its svg element
-        //		
-        //Create the circle element to represent an entity  
-        const circle: SVGCircleElement = document.createElementNS(svgns, "circle");
-        // 
+        //
+        //Create the circle element to represent an entity
+        const circle: SVGCircleElement = document.createElementNS(svgns, 'circle');
+        //
         // Set the circle radius.
-        circle.setAttribute("r", `${this.radius}`);
+        circle.setAttribute('r', `${this.radius}`);
         //
         //Attach the circle to the proxy
         this.proxy.appendChild(circle);
         //
         //2. Draw the entity text
-        // 
+        //
         // Create the text element to represent this  entity
-        const text: SVGTextElement = document.createElementNS(svgns, "text");
+        const text: SVGTextElement = document.createElementNS(svgns, 'text');
         //
         //Attach the text to the proxy
         this.proxy.appendChild(text);
-        // 
+        //
         // Center the text at at its (mvable) position
-        text.setAttribute("text-anchor", "middle");
-        text.textContent = (`${this.name}`);
-        // 
-        //Draw the attributes sub-system of this entity 
+        text.setAttribute('text-anchor', 'middle');
+        text.textContent = `${this.name}`;
+        //
+        //Draw the attributes sub-system of this entity
         const attributes = this.draw_attributes();
         //
-        return {circle, text, attributes}
+        return { circle, text, attributes };
     }
 
-    // 
+    //
     // Draw the rotatable attributes sub-system . It is organized as follows:-
     /*
     <g class="attributes">
@@ -889,103 +899,105 @@ export class entity extends schema.entity{
         </g
     </g>
     */
-    draw_attributes(): {rotatable:SVGElement, polyline:SVGPolylineElement, margin:SVGElement} {
+    draw_attributes(): { rotatable: SVGElement; polyline: SVGPolylineElement; margin: SVGElement } {
         //
-        //A. Prepare the rotaable group of attribute components 
-        // 
+        //A. Prepare the rotaable group of attribute components
+        //
         //Create a group tag for placing all the attributes subsystem.
-        const rotatable:SVGElement = this.document.createElementNS(svgns, "g");
+        const rotatable: SVGElement = this.document.createElementNS(svgns, 'g');
         //
         //Connect the attrobutes to the proxy
         this.proxy.appendChild(rotatable);
-        // 
+        //
         //The class is necessary for styling
         rotatable.setAttribute('class', 'attributes');
-        // 
+        //
         //B. Create the polyline that is the backbone of the attribute texts
         //
-        //Create the polyline element 
-        const polyline: SVGPolylineElement = document.createElementNS(svgns, "polyline");
+        //Create the polyline element
+        const polyline: SVGPolylineElement = document.createElementNS(svgns, 'polyline');
         //
         //Yes, this is the attrobutes backbone
         polyline.classList.add('backbone');
-        // 
+        //
         //Attach the polyline to the svg element
         rotatable.appendChild(polyline);
-        // 
-        //Attach the markers to the polyline segments, assuming that we have 
+        //
+        //Attach the markers to the polyline segments, assuming that we have
         //defined a marker by the 'tick' id
-        polyline.setAttribute("marker-mid", "url(#tick)");
-        polyline.setAttribute("marker-end", "url(#tick)");
-        // 
-        //C. Create a tag for grouping the text elements that represent the 
-        //attribute names, so that we can control their  positioning, especially 
+        polyline.setAttribute('marker-mid', 'url(#tick)');
+        polyline.setAttribute('marker-end', 'url(#tick)');
+        //
+        //C. Create a tag for grouping the text elements that represent the
+        //attribute names, so that we can control their  positioning, especially
         //the top and bottom margins
-        const margin = document.createElementNS(svgns, "g");
+        const margin = document.createElementNS(svgns, 'g');
         margin.classList.add('margin');
         //
         //Attach the margin group to the rotable attrobute group
         rotatable.appendChild(margin);
-        // 
+        //
         //Define the top and left margins of the text labels
         const left: number = 1;
         const top: number = 0.5;
         //
-        // Provide top and and left margins for the attribute text labels  
-        margin.setAttribute("transform", `translate(${left},${top})`);
+        // Provide top and and left margins for the attribute text labels
+        margin.setAttribute('transform', `translate(${left},${top})`);
         //
         //Return the attribute group
-        return {rotatable, polyline, margin};
+        return { rotatable, polyline, margin };
     }
 
     //Move to the new entity psoition:-
     //-the components that make up this entoty
     //-the attrobutes of this entoty
-    //-the relations attached to this entity   
-    move():void{
+    //-the relations attached to this entity
+    move(): void {
         //
         //1. Move the components that make up this entity to the new position
         //
         //Destructure the componets
-        const {circle, text, attributes} = this.component;
+        const { circle, text, attributes } = this.component;
         //
         //Move the circle to this entity's position
-        circle.setAttribute("cx", `${this.position.x}`);
-        circle.setAttribute("cy", `${this.position.y}`);
+        circle.setAttribute('cx', `${this.position.x}`);
+        circle.setAttribute('cy', `${this.position.y}`);
         //
         //Move the labeling text to this enties position
-        text.setAttribute("x", `${this.position.x}`);
-        text.setAttribute("y", `${this.position.y}`);
+        text.setAttribute('x', `${this.position.x}`);
+        text.setAttribute('y', `${this.position.y}`);
         //
         //Destructure the attributes component to reveal the rotable and polyline
         //elements
-        const {rotatable, polyline} = attributes;
-        // 
+        const { rotatable, polyline } = attributes;
+        //
         //Rotate the attributes group about the new entoty location and at
-        //suggested angle. 
-        rotatable.setAttribute("transform", `rotate(${this.angle},${this.position.x}, ${this.position.y})`);
+        //suggested angle.
+        rotatable.setAttribute(
+            'transform',
+            `rotate(${this.angle},${this.position.x}, ${this.position.y})`
+        );
         //
         //Move the attributes polyline
         //
-        //Get the points that define the new polyline segments, in the format of e.g., 
+        //Get the points that define the new polyline segments, in the format of e.g.,
         // ["3,40" "5,36" "9,32"]
-        const points = this
-            .attributes.map((attribute, i) => `${this.position.x}, ${this.position.y - this.radius - 2 * i}`)
-            .join(" ");
-        // 
-        //Set the polyline segments 
+        const points = this.attributes
+            .map((attribute, i) => `${this.position.x}, ${this.position.y - this.radius - 2 * i}`)
+            .join(' ');
+        //
+        //Set the polyline segments
         polyline.setAttribute('points', points);
         //
         //2. Move the attributes of this entity to the new location
-        this.attributes.forEach(attribute => attribute.move());
+        this.attributes.forEach((attribute) => attribute.move());
         //
         //3.Move all the relations linked to this entity so that they may
         //strat or end at this entities new position
-        this.relations.forEach(relation=>relation.move());
-        
+        this.relations.forEach((relation) => relation.move());
     }
 
-    // 		
+    //
     //Mark this entity as selected
     select() {
         //
@@ -998,38 +1010,36 @@ export class entity extends schema.entity{
         //Mark the proxy of this entity as selected
         this.proxy.classList.add('selected');
     }
-    
 }
-
 
 //A metavisuo attribute extends a schema column (not just a schema attribute as
 //expected). This allows to represent foreign keys that point to an external
 //datanase as attributes
-class attribute extends schema.column{
+export class attribute extends schema.column {
     //
     //Redfeine attributes to match those of metavisuo
-    declare attributes:Array<attribute>;
+    declare attributes: Array<attribute>;
     //
     //An attribute has an index, that helps to calculateits  position among its
-    //sibblings. N.B. the invalid default position setting must be rectofoed 
+    //sibblings. N.B. the invalid default position setting must be rectofoed
     //before an attribute is used. This allowa us to set it after creatting the
-    //attribute 
-    public index:number =-1;
+    //attribute
+    public index: number = -1;
     //
-    public proxy:SVGTextElement;
+    public proxy: SVGTextElement;
     //
-    //Note how we  have generalized teh definition of a visual attrobute beyond 
-    //that of s schema, so that we can regard foreign keys that reference a 
-    //database external to this one as metavisual attribute  
-    constructor(public entity:entity, col:schema.column){
+    //Note how we  have generalized teh definition of a visual attrobute beyond
+    //that of s schema, so that we can regard foreign keys that reference a
+    //database external to this one as metavisual attribute
+    constructor(public entity: entity, col: schema.column) {
         //
         //Initialize the  schema version of an attribute
         super(entity, col.static_data);
-        // 
+        //
         //Create a group tag for placing all our attributes.
-        this.proxy = this.document.createElementNS(svgns, "text");
-        // 
-        //Append the proxy of this table to the given margin element of the 
+        this.proxy = this.document.createElementNS(svgns, 'text');
+        //
+        //Append the proxy of this table to the given margin element of the
         //underlying entity
         entity.component.attributes.margin.appendChild(this.proxy);
         //
@@ -1037,8 +1047,8 @@ class attribute extends schema.column{
         this.show();
     }
 
-    // 
-    //Show/draw this atttribute, linking it to the margin element of the 
+    //
+    //Show/draw this atttribute, linking it to the margin element of the
     //containing attribute
     show(): void {
         //
@@ -1046,13 +1056,13 @@ class attribute extends schema.column{
         this.proxy.textContent = this.name;
         //
         //Get a class list to support giving this attribute different appearances
-        const list:DOMTokenList = this.proxy.classList;
+        const list: DOMTokenList = this.proxy.classList;
 
         //Mark attributes that have errors
-        if (this.errors.length>0) list.add('error');
+        if (this.errors.length > 0) list.add('error');
         //
         //Mark attributes whose usage is mandatory
-        if (this.is_nullable!=='YES') list.add('mandatory')
+        if (this.is_nullable !== 'YES') list.add('mandatory');
         //
         //Mark attributes that are used for identification. This is difficult
         //to do using css, because svg.text is not a normal HTML attribute. Mark
@@ -1060,45 +1070,44 @@ class attribute extends schema.column{
         if (this.is_id()) this.proxy.textContent += '*';
     }
 
-    //Move the entity to match the parent entity 
-    move(){
+    //Move the entity to match the parent entity
+    move() {
         //
         //Set the x coordinate to the fixed value of x
-        this.proxy.setAttribute("x", `${this.entity.position.x}`);
+        this.proxy.setAttribute('x', `${this.entity.position.x}`);
         //
         //Set the y coordinate as follows:-
-        const y:number =
+        const y: number =
             //
             //Start from the center of the entity
-            this.entity.position.y
+            this.entity.position.y -
             //
             //Move upwards by entoty radius units
-            - this.entity.radius 
+            this.entity.radius -
             //
             //Move up 1 unit to clear the circle boundary
-            -1
+            1 -
             //
             //Place the label at 2 times its index
-            -2*this.index;
-        //    
-        this.proxy.setAttribute("y", String(y));
-        
+            2 * this.index;
+        //
+        this.proxy.setAttribute('y', String(y));
     }
 }
 
 //
 //A metavisuo relation is an extension of a schema foreign key column
-class relation extends schema.foreign{
-    // 
+class relation extends schema.foreign {
+    //
     //The the svg element that represents the visual aspect of this relationship
-    public proxy:SVGElement;
+    public proxy: SVGElement;
     //
     //The polyline that represents a relation
-    public polyline:SVGPolylineElement;
-    // 
-    //A relation is construcructed using data from a foreign key and metavisuo 
+    public polyline: SVGPolylineElement;
+    //
+    //A relation is construcructed using data from a foreign key and metavisuo
     //entity that is its source
-    constructor(public col:schema.foreign, public entity:entity) {
+    constructor(public col: schema.foreign, public entity: entity) {
         //
         super(entity, col.static_data);
         //
@@ -1109,41 +1118,45 @@ class relation extends schema.foreign{
         //polyline will be hooked
         this.proxy = this.document.createElementNS(svgns, 'g');
         //
-        //Link the proxies of both this relation and the given entity. This 
+        //Link the proxies of both this relation and the given entity. This
         //ensures that if the entity is hidden, the relation, too, will be hidden
         entity.proxy.appendChild(this.proxy);
-        // 
-        //The class that will style the lines showing the relations. 
+        //
+        //The class that will style the lines showing the relations.
         this.proxy.classList.add('relation');
         //
         //If there are errors in this relation, then mark it as such
-        if (this.errors.length>0) this.proxy.classList.add('error');
+        if (this.errors.length > 0) this.proxy.classList.add('error');
         //
-        //Draw a a relation to return the plyline (which can take part in move 
+        //Draw a a relation to return the plyline (which can take part in move
         //later)
         this.polyline = this.draw();
     }
 
-    
-
     //
     //Get the source and destination entities of this relation
-    get src():entity {return this.entity};
-    get dest():entity {return this.entity.dbase.entities[this.ref.ename]}
-    
-    //Collect additional errors found in a relation beyond this inherited from 
+    get src(): entity {
+        return this.entity;
+    }
+    get dest(): entity {
+        return this.entity.dbase.entities[this.ref.ename];
+    }
+
+    //Collect additional errors found in a relation beyond this inherited from
     //the column used in its construction
-    *collect_errors():Generator<Error>{
+    *collect_errors(): Generator<Error> {
         //
         //Cyclic definitions are invalid definitions
-        const {dbname, ename} = this.col.ref;
-        if (dbname===this.dest.dbase.name  && ename===this.dest.name) yield new Error("This relation is cyclic");
+        const { dbname, ename } = this.col.ref;
+        if (dbname === this.dest.dbase.name && ename === this.dest.name)
+            yield new Error('This relation is cyclic');
         //
-        //If a relation is not hierarchical and its column name does not match 
+        //If a relation is not hierarchical and its column name does not match
         //that of the referenced entity, then this is not comformant to the
         //standar way of expressing joins, i.e., x join y on x.y==y.y will not
         //work if this rule is not observed
-        if (!this.col.is_hierarchical && ename!==this.dest.name) yield Error("Referenced source column and destination entity names are different");
+        if (!this.col.is_hierarchical && ename !== this.dest.name)
+            yield Error('Referenced source column and destination entity names are different');
     }
 
     //
@@ -1153,78 +1166,81 @@ class relation extends schema.foreign{
         //
         //Create the plyline component of a ralation
         const polyline = <SVGPolylineElement>this.document.createElementNS(svgns, 'polyline');
-        // 
+        //
         //Attach the polyline to the visual svg element
         this.proxy.appendChild(polyline);
-        // 
-        //Attach the arrow marker to the middle point of the polyline. 
+        //
+        //Attach the arrow marker to the middle point of the polyline.
         //polyline.setAttribute("marker-mid", "url(#arrow)");
         //
         //Attach a marker at the beginning of the polyline, depending on the type
         //of the relion, i.e., optional/mandatory or identifier/non-identifier.
-        //N.B. Ensure that the named markers are available. How? 
+        //N.B. Ensure that the named markers are available. How?
         //By executing the marker drawing code before this step
-        polyline.setAttribute("marker-start", `url(#${this.get_marker_name()})`);
+        polyline.setAttribute('marker-start', `url(#${this.get_marker_name()})`);
         //
         return polyline;
     }
 
     //Move the componnets of a ralation, notably the polyline, to match the
     //source and destinatiopn entity positions
-    move():void{
+    move(): void {
         //
         //Get the 3 points that define the relation betweeen the source  and
-        //the destination entities, e.g., 
+        //the destination entities, e.g.,
         //{start:{x:4,y:50}, mid:{x:7, y:10}, end:{x:40, y:19}}
-        const {start, mid, end} = this.get_relation_points(this.src, this.dest);
+        const { start, mid, end } = this.get_relation_points(this.src, this.dest);
         //
-        //Express the points in the form required for a polyline, e.g., 4,50 7,10 40,19 
+        //Express the points in the form required for a polyline, e.g., 4,50 7,10 40,19
         const p1 = `${start.x},${start.y}`;
         const p2 = `${mid.x}, ${mid.y}`;
         const p3 = `${end.x},${end.y}`;
-        // 
+        //
         //Set the polyline's points attribute
         this.polyline.setAttribute('points', `${p1} ${p2} ${p3}`);
     }
-    
+
     //Returns the name of the marker, depending on the type of this relation
-    get_marker_name():string{
+    get_marker_name(): string {
         //
         //Determine whether this relation is optional or not
-        const optional:boolean = this.is_nullable==='YES';
+        const optional: boolean = this.is_nullable === 'YES';
         //
         //Determine whether this relation is used for identification or not
-        const id:boolean = this.is_id();
+        const id: boolean = this.is_id();
         //
-        //Determine the type of chicken foot depending on the 2 the 2 
+        //Determine the type of chicken foot depending on the 2 the 2
         //variables:optional or id
-        switch(optional){
+        switch (optional) {
             case true:
-                switch(id){
-                    case true: return "foot_optional_identifier";
-                    case false:return "foot_optional";
-                }    
+                switch (id) {
+                    case true:
+                        return 'foot_optional_identifier';
+                    case false:
+                        return 'foot_optional';
+                }
             case false:
-                switch(id){
-                    case true: return "foot_manda_identifier";
-                    case false:return "foot_mandatory";
+                switch (id) {
+                    case true:
+                        return 'foot_manda_identifier';
+                    case false:
+                        return 'foot_mandatory';
                 }
         }
-    }    
-    
-    
+    }
+
     //The second version of calculating the exact mid point
     //
-    //There are 3 points of interest along the hypotenuse between source entity a 
+    //There are 3 points of interest along the hypotenuse between source entity a
     //and destination entity b, viz.,start, mid and end.
-    get_relation_points(a: entity, b: entity): {start: DOMPoint, mid: DOMPoint, end: DOMPoint} {
+    get_relation_points(a: entity, b: entity): { start: DOMPoint; mid: DOMPoint; end: DOMPoint } {
         //
-        //IN MOST CASES, when the x coordinate of circle 1 is equivalent to the 
-        //x-coordinate of circle 2, then we have a zero difference that will be 
-        //carried forward to be evaluated later on, will return values of 
+        //IN MOST CASES, when the x coordinate of circle 1 is equivalent to the
+        //x-coordinate of circle 2, then we have a zero difference that will be
+        //carried forward to be evaluated later on, will return values of
         //infinity or zero later on.
         //
-        //To prevent this from happening, if the difference, i.e., (b.y - a.y) or (b.x - a.x) is 
+        //To prevent this from happening, if the difference, i.e., (b.y - a.y) or (b.x - a.x) is
         //zero, set it to be greater than zero,i.e., 0.1 or greater.
         //
         //
@@ -1232,24 +1248,22 @@ class relation extends schema.foreign{
         //
         //The 'opposite' is the y distance between a and b
         //const opposite:number= b.y - a.y;
-        if ((b.y - a.y) !== 0) {
+        if (b.y - a.y !== 0) {
             opposite = b.y - a.y;
-        }
-        else {
+        } else {
             opposite = 0.1;
         }
         let adjacent: number;
         //
         //The 'adjacent' is the x distance between the source entity of a and destination entity b
         //const adjacent = b.x - a.x;
-        if ((b.x - a.x) !== 0) {
+        if (b.x - a.x !== 0) {
             adjacent = b.x - a.x;
-        }
-        else {
+        } else {
             adjacent = 0.1;
         }
         //
-        //The hypotenuse is the square root of the squares of the 'adjacent' and 
+        //The hypotenuse is the square root of the squares of the 'adjacent' and
         //the 'opposite'
         const hypotenuse = Math.sqrt(adjacent * adjacent + opposite * opposite);
         //
@@ -1260,24 +1274,24 @@ class relation extends schema.foreign{
         const thita: number = Math.atan(tanthita);
         //
         //The angle of interest is...
-        const phi = (adjacent > 0) ? thita : Math.PI + thita;
+        const phi = adjacent > 0 ? thita : Math.PI + thita;
         //
-        //Let 'start' be the point at  the intersection of the entity centered as the source 
+        //Let 'start' be the point at  the intersection of the entity centered as the source
         const start = this.get_point(a, phi, a.radius);
         //
         //Let 'mid' be the point mid way along entity source and destination hypotenuse
         const mid = this.get_point(a, phi, 0.5 * hypotenuse);
         //
-        //Let 'end' be the point at the intersection of hypotenuse and the entity referred as the  
+        //Let 'end' be the point at the intersection of hypotenuse and the entity referred as the
         //destination
         const end = this.get_point(a, phi, hypotenuse - b.radius);
         //
         //Compile and return the desired final result
-        return {start, mid, end};
+        return { start, mid, end };
     }
-    // 
+    //
     //Returns the coordinates of the point which is 'hypo' units from 'a' along
-    //the hypotenuse of a and b (which is inclined at angle thita) 
+    //the hypotenuse of a and b (which is inclined at angle thita)
     get_point(a: entity, thita: number, hypo: number): DOMPoint {
         //
         //The 'opp' is the 'hypo' times the sine of 'thita';
@@ -1296,4 +1310,4 @@ class relation extends schema.foreign{
         //The desired point is at x and and y units from the origin
         return new DOMPoint(x, y);
     }
-}   
+}
