@@ -58,9 +58,9 @@ The color of a selected*/
 /*
 Mandatory vs optional*/
 .mandatory {
-    fill: rgb(252, 8, 232);
-    text-decoration: underline;
-    font-style: italic;
+    fill: #fc08e8;
+    stroke-width: 0;
+    stroke: currentColor;
 }
 
 /*

@@ -1,5 +1,9 @@
-import { metavisuo, attribute } from '../code/metavisuo.js';
+import { metavisuo, attribute, database } from '../code/metavisuo.js';
 import { mutall_error, svgns } from '../../../outlook/v/code/view.js';
+import { exec } from '../../../schema/v/code/server.js';
+//
+//Define the type to hold the viewbox settings
+type vb_settings = { pan_x: number; pan_y: number; zoom_x: number; zoom_y: number };
 //
 // A class to improve the review functionalities of metavisuo
 export class metareview extends metavisuo {
@@ -23,6 +27,64 @@ export class metareview extends metavisuo {
         //
         //Do a simmilar thing for the comments
         this.get_element('comments').onclick = () => this.toggle_metadata('comment');
+    }
+    //
+    //Override the creation of a metavisuo database to handle the loading of the svg settings of a particular database
+    async create_metadb(dbname: string): Promise<database> {
+        //
+        //Get the database that will be constructed from the parent class
+        const dbase: database = await super.create_metadb(dbname);
+        //
+        //Now using the database load the svg
+        return await this.load_settings(dbase);
+    }
+    //
+    //Collect the viewbox settings of the particular database that is displayed
+    //and update the svg to reflect the saved settings
+    private async load_settings(dbase: database): Promise<database> {
+        //
+        //Query for getting the svg settings
+        const sql: string = `SELECT 
+            pan_x, 
+            pan_y, 
+            zoom_x, 
+            zoom_y 
+        FROM 
+            dbase 
+        WHERE 
+            name = '${dbase.name}'`;
+        //
+        //Query the metavisuo dbase to get the data
+        const rows: Array<vb_settings> = await exec(
+            'database',
+            ['metavisuo', false],
+            'get_sql_data',
+            [sql]
+        );
+        //
+        //Ensure only one row was returnd
+        if (rows.length > 1)
+            throw new mutall_error(
+                'One database cannot have multiple viewbox settings. Check you database'
+            );
+        //
+        //Get the settings
+        const setting: vb_settings = rows[0];
+        //
+        //Now load the settings to the svg
+        dbase.proxy.setAttribute(
+            'viewBox',
+            `${[setting.pan_x, setting.pan_y, setting.zoom_x, setting.zoom_y]}`
+        );
+        //
+        //Update the viewbox settings
+        dbase.panx = setting.pan_x;
+        dbase.pany = setting.pan_y;
+        dbase.zoomx = setting.zoom_x;
+        dbase.zoomy = setting.zoom_y;
+        //
+        //return the modified database
+        return dbase;
     }
     //
     //This procedure is responsible for showing or  hiding the create_metadata of various attributes
@@ -54,7 +116,7 @@ export class metareview extends metavisuo {
     }
     //
     //This method is to display additional infomation about an attribute
-    //This may be a comment or the datatype to help programmers understand 
+    //This may be a comment or the datatype to help programmers understand
     //how to work with data from the given attribute
     //The datatype will be separated using a ':' (Pascal notation) while the comment of the attribute will be demacated by a //
     //In the case of strings we also need to indicate the length of the string
@@ -63,13 +125,20 @@ export class metareview extends metavisuo {
         //Calculate the position along the horizontal axis
         const y: number = attrib.entity.position.y - attrib.entity.radius - 1 - 2 * attrib.index;
         //
+        //The length of the attribut name
+        const len: number = attrib.name.length;
+        //
+        //Xpos depending on the length of the attribute name determine the length of displacement to show the
+        //data type or the comment next to the attribute
+        const xpos: number = len < 5 ? 6 : len < 8 ? 8 : 10;
+        //
         //Ensure a comment is present before displaying it
         if (attrib.comment) {
             //
             //Create a text element for showing the comment
             const comment: SVGTextElement = this.create_metadata(
                 `// ${attrib.comment}`,
-                { x: attrib.entity.position.x + 10, y: y },
+                { x: attrib.entity.position.x + xpos, y: y },
                 'comment'
             );
             //
@@ -77,13 +146,16 @@ export class metareview extends metavisuo {
             attrib.entity.component.attributes.margin.appendChild(comment);
         }
         //
+        //The length of characters to be taken
+        const length: string = attrib.data_type === 'varchar' ? `(${attrib.length})` : '';
+        //
         //Ensure that  the attribute datatype is present before displaying
         if (attrib.data_type) {
             //
             //Create a text element to display the datatype
             const dtype: SVGTextElement = this.create_metadata(
-                `:${attrib.data_type}`,
-                { x: attrib.entity.position.x + 10, y: y },
+                `:${attrib.data_type} ${length} `,
+                { x: attrib.entity.position.x + xpos, y: y },
                 'data_type'
             );
             //
