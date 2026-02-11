@@ -2,12 +2,35 @@
 //we can define extended versions of the same components in a separate (metavisuo)
 //namespace
 import * as schema from '../../../schema/v/code/schema.js';
-import { myalert, page, svgns } from '../../../outlook/v/code/view.js';
+import { page } from '../../../outlook/v/code/outlook.js';
 import { exec } from '../../../schema/v/code/server.js';
 import { label } from '../../../schema/v/code/questionnaire.js';
+import { myerror, foreign, primary, mutall_error } from '../../../schema/v/code/schema.js';
+import { myalert } from '../../../schema/v/code/mutall.js';
+//
+// Define the namespace needed to create svg elements. This is needed by the
+//metavisuo system. Its defined here to prevent cluttering the mataviouo namespace
+export const svgns = 'http://www.w3.org/2000/svg';
+//
+//Define the structure of an attribute metadata
+type metadata = { comments?: SVGTextElement; data_types?: SVGTextElement };
+//
+//Define the type to hold the viewbox settings
+type vb_settings = { pan_x: number; pan_y: number; zoom_x: number; zoom_y: number };
+//
+//Database settings useful when constructing the erd
+type info = {
+    hidden: Array<string>;
+} & vb_settings;
+//
+//Db initialization settings
+type init = { [dbname: string]: info };
 
 //The metavisouo application class
 export class metavisuo extends page {
+    //
+    //The key in the local storage to retrieve and store the last viewd db
+    static db_key: string = 'last_dbase';
     //
     //This database is set when???
     protected current_db?: database;
@@ -16,10 +39,9 @@ export class metavisuo extends page {
     private selector?: HTMLSelectElement;
     //
     //class constructor.
-    constructor() {
+    constructor(public cwd: string, public db?: string) {
         super();
     }
-
     //
     //Generate the structure from the given named database among the list of all
     //available databases and draw its visual structure
@@ -32,7 +54,8 @@ export class metavisuo extends page {
             'database',
             [dbname, true, false],
             'export_structure',
-            []
+            [],
+            this.cwd
         );
         //
         //Use the generated schema.Idatabase to generate a database structure
@@ -42,7 +65,60 @@ export class metavisuo extends page {
         const content = this.get_element('content');
         //
         //Create the database structure to visualize
-        return new database(content, dbase);
+        return new database(content, dbase, this.cwd);
+    }
+    //
+    //Display the errors that are in the current selected entity
+    public show_errors(): void {
+        //
+        // Get the selected entity
+        const entity: entity = this.get_selected_entity();
+        //
+        //Get the error report
+        const report: string = this.get_report(entity);
+        //
+        //Show the report
+        myalert(report);
+    }
+    //
+    //Get the error report from the currenty selected entity in this
+    //metavisuo appliction
+    private get_report(entity: entity): string {
+        //
+        // Get the entity errors
+        const myerrors: Array<myerror> = entity.errors;
+        //
+        // If there is no error return with appropriate message
+        if (myerrors.length === 0) return 'No errors found.';
+        //
+        //Compile the errors in a detail/summary arrangement, separated by line breaks
+        const report: string = myerrors
+            .map(
+                (error) => `
+        <details>
+            <summary>${error.message}</summary>
+            ${error.stack}
+        </details>
+    `
+            )
+            .join('<br/>');
+        //
+        // Return the report of errors
+        return report;
+    }
+    //
+    //This procedure is responsible for showing or  hiding the comment or datatypes of the various
+    //entities
+    public toggle_metadata(selector: 'data_type' | 'comment'): void {
+        //
+        //Get all the containers identified by the given selector
+        //These are the containers holding either comments or data types
+        const metadata_elements: Array<Element> = Array.from(
+            this.document.querySelectorAll('.' + selector)
+        );
+        //
+        //Iterate over the collection of metadata elements showing /hidding the metadata
+        metadata_elements.forEach((element) => element.classList.toggle('hidden'));
     }
     //
     //Populate the selector designated to hold all the named databases on
@@ -69,7 +145,8 @@ export class metavisuo extends page {
         //
         //Extract all database names  except mysql, performance_schema,phpmyadmin
         //sys, and information schema
-        const sql: string = `select 
+        const sql: string = `
+            select 
                 schema_name as dbname 
             from 
                 information_schema.schemata
@@ -89,7 +166,8 @@ export class metavisuo extends page {
             'database',
             ['information_schema'],
             'get_sql_data',
-            [sql]
+            [sql],
+            this.cwd
         );
         //
         //Compile and return the list
@@ -117,10 +195,33 @@ export class metavisuo extends page {
         this.selector.onchange = async () => await this.show_dbase();
         //
         //Select the last database
-        if (localStorage['last_dbase']) this.selector.value = localStorage['last_dbase'];
+        //
+        //If a db was supplied  at the constructor level do as follows
+        if (this.db) {
+            //
+            //Find out if the requested database exist. If it does set it as the selected dbase
+            //since the ploting is done based on the selection
+            if (dbnames.includes(this.db)) this.selector.value = this.db;
+            //
+            //TODO:What to do if the requested db is not fount in the system??????
+            throw new schema.mutall_error('The requested database was not found in the system!!');
+        }
+        //
+        //If no desired database was passed check the local storage for a database that was shown last
+        else if (localStorage[metavisuo.db_key])
+            this.selector.value = localStorage[metavisuo.db_key];
+        //
+        //If there is no last database in the local storage use the first db in the system
+        else this.selector.value = dbnames[1];
         //
         //Show the selected database
         await this.show_dbase();
+        //
+        //Add the functionality to show/hide the datatypes
+        this.get_element('data_types').onclick = () => this.toggle_metadata('data_type');
+        //
+        //Do a simmilar thing for the comments
+        this.get_element('comments').onclick = () => this.toggle_metadata('comment');
     }
 
     //On selecting a database, show it; then save it to the local storage for
@@ -134,7 +235,7 @@ export class metavisuo extends page {
         const dbname: string = this.get_selected_value('databases');
         //
         //Save the selected database to the local storage for future references
-        window.localStorage['last_dbase'] = dbname;
+        window.localStorage[metavisuo.db_key] = dbname;
         //
         //Get the named metavisuo database -- an extension of the schema.database --
         //and make it the current one.
@@ -143,10 +244,80 @@ export class metavisuo extends page {
         //Show all the the entities and their relationships
         await this.current_db.show();
     }
+    //
+    //Get the selected value from the identified selector.
+    //There must be a selected value.
+    public get_selected_value(id: string): string {
+        //
+        //Get the Select Element identified by the id.
+        const select = this.get_element(id);
+        //
+        //Ensure that the select is a HTMLSelectElement.
+        if (!(select instanceof HTMLSelectElement))
+            throw new mutall_error(`The element identified by '${id}' is not a HTMLSelectElement.`);
+        //
+        //Ensure that the select element value is set.
+        if (select.value === '')
+            throw new mutall_error(
+                `The value of the select element identified by '${id}' is not set.`
+            );
+        //
+        //Return the selected value
+        return select.value;
+    }
+    //
+    // Get the selected entity
+    get_selected_entity(): entity {
+        //
+        // Get the current database
+        const database: database | undefined = this.current_db;
+        //
+        //If there is none, abort this procedure and alert the user
+        if (!database) throw new schema.mutall_error('Please select a database');
+        //
+        // Get the entities in the datanase
+        const entities: { [index: string]: entity } = database.entities;
+        //
+        //Get the selected entity element
+        const element: HTMLElement | null = this.document.querySelector('.selected');
+        //
+        //Abort this process if there is no selection
+        if (!element) throw new schema.mutall_error('Please select an entity');
+        //
+        //The selected entity has an id tha matches the entity name
+        const ename: string = element.id;
+        //
+        // Get the named entity entity
+        const entity: entity | undefined = entities[ename];
+        //
+        //If no such name entoty is found, alert the user
+        if (!entity) throw new schema.mutall_error(`No entity is found by id '${ename}'`);
+        //
+        return entity;
+    }
+    //
+    //Hide an entity that was selected also hide all the relationships to  and from that entity
+    public hide(): void {
+        //
+        //Get the selected entity
+        const selected: entity = this.get_selected_entity();
+        //
+        //hide the selected entity
+        selected.proxy.classList.add('hidden');
+        //
+        //Hide all the relations of the entity
+        selected.__relations?.forEach((rel: relation) => rel.proxy.classList.add('hidden'));
+        //
+        //Deselect the entity
+        selected.proxy.classList.remove('selected');
+    }
 }
-
+//
 //A metavisual database extends the schema version
 export class database extends schema.database {
+    //
+    //The key to where the database initialization settings are stored
+    public static key: string = 'db_init';
     //
     //The entities of the current application database.
     public entities: { [index: string]: entity };
@@ -164,7 +335,13 @@ export class database extends schema.database {
     public zoomx: number = 128;
     public zoomy: number = 64;
 
-    public proxy: SVGElement;
+    //Change the proxy data type to svg element
+    public get proxy(): SVGElement {
+        return <SVGElement>super.proxy;
+    }
+    public set proxy(p: SVGElement) {
+        super.proxy = p;
+    }
     //
     //The database name that holds the metadata; its either this database -- if
     //the metadata is embeded, or the standalone metavisuo database
@@ -182,7 +359,10 @@ export class database extends schema.database {
         //
         //The schema database that is the extension of this meta-visuo version is
         //the one to which
-        public dbase: schema.database
+        public dbase: schema.database,
+        //
+        //Reference to the directory where the program was launched form
+        public cwd: string
     ) {
         //A database is the highest object in the matavisuo hierarchy and
         //therefore has no parent
@@ -229,13 +409,313 @@ export class database extends schema.database {
         //
         //Create arrow markers, e.g., the crawfoot for relationships,
         this.create_markers();
+        //
+        //Prepare a list of all the entities to facilitate the hiding and unhidding of entities
+        this.entities_list();
     }
-
+    //
+    //Collect the viewbox settings of the particular database that is displayed
+    //and update the svg to reflect the saved settings
+    private async load_settings(): Promise<void> {
+        //
+        //Get the db settings
+        const setting: string | null = this.win.localStorage.getItem(database.key);
+        //
+        //If no settings are present discontinute the process
+        if (!setting) return;
+        //
+        //Get the viewbox settings from the local storge
+        const initialization: init = JSON.parse(setting);
+        //
+        //Locate the initialization settings of the particular dbase
+        const db_setting: info | undefined = initialization[this.dbase.name];
+        //
+        //If there are no settings for the current database stop the process
+        if (!db_setting) return;
+        //
+        //Update the viewbox settings
+        this.panx = db_setting.pan_x;
+        this.pany = db_setting.pan_y;
+        this.zoomx = db_setting.zoom_x;
+        this.zoomy = db_setting.zoom_y;
+        //
+        //Add the view box attribute, based on the zoom and pan settings.
+        this.proxy.setAttribute('viewBox', `${[this.panx, this.pany, this.zoomx, this.zoomy]}`);
+        //
+        //Go through all the hidden entities and hide them
+        db_setting.hidden.forEach((entity: string) => this.toggle_visiblility(entity, false));
+    }
+    //
+    //Produce a list of entities that will have functionality to toggle the visiblility of the given
+    //entities
+    private entities_list() {
+        //
+        //Get the section where to display the entities list
+        const section: HTMLElement = this.get_element('entities');
+        //
+        //Populate the list of entities that will be used to show/hide the entities
+        this.list_entities(section);
+        //
+        //Always hide the entity list when creating a dbase
+        section.classList.remove('show');
+        //
+        //Add the functionality to show or hide the entity list
+        this.get_element('show').onclick = () => {
+            //
+            //Get the selected entity element
+            const element: HTMLElement | null = this.document.querySelector('.selected');
+            //
+            //If no entity was selected show the list all the entities.
+            if (!element) section.classList.toggle('show');
+            //
+            //Otherwise show the entities linked to the selected one
+            else this.show_closest(this.entities[element.id]);
+        };
+    }
+    //
+    // Show the entities that are directly linked to the given entity
+    // This method is important when explaining a database model in that you can start from a single
+    // entity and progressively show more entities along the presentation
+    //
+    //To get all related entities to a given entity look for all the entities which
+    // have a foreign key simmilar to the primary key of the entity provided. Other than that
+    // We also need to take care of the fact that other relationshps to the given entity are constructed
+    //using foreign keys
+    public show_closest(entity: entity): void {
+        //
+        //Handle the case where the other entities point to this entity(Primary key)
+        //
+        //Go through all the relationships and if the ref points to this particular entity
+        //Show it
+        this.relations.forEach((relation) => {
+            if (relation.ref.ename === entity.name) {
+                //
+                //Show the table
+                this.toggle_visiblility(relation.entity.name);
+                //
+                //Also ensure all relations are not hidden
+                relation.proxy.classList.remove('hidden');
+            }
+        });
+        //
+        //Handle the case of foreign keys
+        //
+        //Get all the foreign keys in the entity
+        for (const column in entity.columns) {
+            //
+            //Get the column
+            const c: foreign | attribute | primary = entity.columns[column];
+            //
+            //If the column is a foreign column show the entity where it came form
+            if (c instanceof foreign) this.toggle_visiblility(c.ref.ename);
+        }
+    }
+    //
+    //This helps with the functionality of either hidding or showing an entity and its relations
+    //We need to know the entitiy and the visibility status that is required.
+    private toggle_visiblility(entity: string, is_visible: boolean = true): void {
+        //
+        //Identify the entity using the name
+        const e: entity = this.entities[entity];
+        //
+        //Handle the case when the user wants the entity hidden
+        if (!is_visible) {
+            //
+            //Hide its visual representation
+            e.proxy.classList.add('hidden');
+            //
+            //Hide all the relationships that start and end from the hidden entity
+            this.relations.forEach((relation) => {
+                //
+                //Get the foregin key column in the relationship
+                const foreign: foreign = relation.col;
+                if (foreign.ref.dbname === this.dbase.name && foreign.ref.ename === e.name)
+                    relation.proxy.classList.add('hidden');
+            });
+            //
+            // exit after hidding
+            return;
+        }
+        //
+        //When we get here we know that we are supposed to show the entity and all its relations
+        //
+        //The entity
+        this.entities[entity].proxy.classList.remove('hidden');
+        //
+        //The relations of the given entity
+        this.relations.forEach((relation) => {
+            //
+            //Get the foregin key column in the relationship
+            const foreign: foreign = relation.col;
+            if (foreign.ref.dbname === this.dbase.name && foreign.ref.ename === entity)
+                relation.proxy.classList.remove('hidden');
+        });
+        //
+        //exit
+        return;
+    }
+    //
+    //This produces a list of all entities of the current database and a checkbox alongside
+    //the entities to signify the visibility. If checked the entity is visible otherwise the entitiy
+    //is hidden. This list will be visible once the user clicks on the show button
+    //From this list a users can either hide  or unhide the entities  as they desire
+    private list_entities(section: HTMLElement): void {
+        //
+        //Clear the section
+        section.innerHTML = '';
+        //
+        //Add option to select all entities
+        this.add_select_all(section);
+        //
+        //Get the settings stored in the local storage
+        const settings: string | null = this.win.localStorage.getItem(database.key);
+        //
+        //From the settings get the hidden entities
+        const hidden: Array<string> | undefined = settings
+            ? JSON.parse(settings)[this.dbase.name]?.hidden
+            : undefined;
+        //
+        //for each entity create an option in the list
+        //
+        //The layout of the option should be as follows
+        /*
+            <label>
+                <input type="checkbox" value=key/>
+                <span>key </span>
+            </label>
+        */
+        //Once the option is created we should check if the entity was initially
+        //hidden or not to make the desicion weathe the checkbox is checked or not
+        for (const key in this.entities) {
+            //
+            //Create the label to house the checkbox and the entity name
+            const env: HTMLLabelElement = this.create_element('label', section, {
+                className: 'entity_checkbox',
+            });
+            //
+            //Options to create the checkbox
+            const options: any = {
+                type: 'checkbox',
+                value: key,
+            };
+            //
+            //Check the checkbox only when the entity is visible
+            if (!hidden || !hidden.includes(key)) options.checked = true;
+            //
+            //Create the checkbox
+            const chkbox = this.create_element('input', env, options);
+            //
+            //Attach the change listener
+            chkbox.onchange = () => this.change(chkbox);
+            //
+            //Create a label for the particular checkbox
+            this.create_element('span', env, {
+                textContent: key,
+            });
+        }
+    }
+    //
+    //TODO:Unhiding of entities
+    //
+    //The function that is responsible for hidding or unhidding of entities depending on
+    //their visibility status.
+    private change(chkbox: HTMLInputElement): void {
+        //
+        //Get the value of the given chekbox
+        const entity: string = chkbox.value;
+        //
+        //Check to see if the checkbox is currently checked or unchecked
+        //If checked it means that the user want the entity that was initially hidden
+        //displayed and if uncheckd the user wants to hide the entity
+        //
+        if (chkbox.checked) this.toggle_visiblility(entity);
+        //
+        //Otherwise hide the given entity
+        else this.toggle_visiblility(entity, false);
+    }
+    //
+    //Add an option to select or disselect all the entities in the given database
+    //The first step is to produce the html bellow:-
+    /*
+        <label>
+            <input type="checkbox"/>
+            <span id = "show" class="hidden">Show all</span>
+            <span id = "hide" class="hidden">Hide all</span>
+        </label>
+        <hr/>
+    */
+    //The two messages should be shown whenever appropriate.
+    private add_select_all(section: HTMLElement): void {
+        //
+        //Create a label
+        const label: HTMLLabelElement = this.create_element('label', section);
+        //
+        //Create a checkbox to select all entities
+        const chkbox: HTMLInputElement = this.create_element('input', label, {
+            type: 'checkbox',
+        });
+        //
+        //Add the labels to the checkbox
+        //
+        //This label displays when the checkbox is unchecked
+        this.create_element('span', label, {
+            textContent: 'Show all',
+            id: 'show_label',
+        });
+        //
+        //THis label is to be shown when the checkbox is checked
+        this.create_element('span', label, {
+            textContent: 'Hide all',
+            id: 'hide',
+            className: 'hidden',
+        });
+        //
+        //Add a horizontal rule to separate the entities from the select all option
+        this.create_element('hr', section);
+        //
+        //Add the functionality to select or deselect all the checkboxes
+        chkbox.onchange = () => this.toggle_entities_visibility(chkbox, section);
+    }
+    //
+    //This function handles hidding or unhidding all the entities of a given database
+    private toggle_entities_visibility(chkbox: HTMLInputElement, section: HTMLElement): void {
+        //
+        //Ensure that the correct label is displayed
+        if (chkbox.checked) {
+            //
+            //Get the label showing and hide it
+            this.get_element('show_label').classList.add('hidden');
+            //
+            //finally show the appropriate message
+            this.get_element('hide').classList.toggle('hidden');
+        } else {
+            //
+            //Hide the label initially showing
+            this.get_element('hide').classList.toggle('hidden');
+            //
+            //Show the appropriate message
+            this.get_element('show_label').classList.toggle('hidden');
+        }
+        //
+        //Get all the checkboxes from the given section
+        const checkboxes: Array<Element> = Array.from(
+            section.querySelectorAll('input[type="checkbox"]')
+        );
+        //
+        //Go through the all the checkboxes and either check or uncheck them
+        checkboxes.forEach((checkbox) => ((checkbox as HTMLInputElement).checked = chkbox.checked));
+        //
+        //Show or hide all the entities
+        for (const entitiy in this.entities) this.toggle_visiblility(entitiy, chkbox.checked);
+    }
     //
     //Show all the entities and their relationships by moving them to their
     //respective positions. N.B. These schema objects were drawn when they were
     //constructed.
     async show(): Promise<void> {
+        //
+        //load the viewbox settings at this point
+        this.load_settings();
         //
         //Load the position data for the entities from the database
         await this.load_x_y_positions();
@@ -464,7 +944,6 @@ export class database extends schema.database {
         //Start with an empty collection of entites
         const entities: { [index: string]: entity } = {};
         //
-        //
         //Loop over all schema entities and convert them to metavisuo versions, saving and
         //drawing them at the same time
         for (const ename in dbase.entities) {
@@ -493,13 +972,94 @@ export class database extends schema.database {
             'questionnaire',
             [this.meta_dbname],
             'load_common',
-            [layouts]
+            [layouts],
+            this.cwd
         );
+        //
+        //Save to the local storage also
+        this.save_local_storage();
         //
         //Report the result
         myalert(result);
     }
-
+    //
+    //Save database information in the local_strorage
+    //When saving use the following structure
+    //type db_init = {[dbname:string]: info}
+    //
+    /*
+    type info ={
+        hidden:Array<entities>,
+        pan_x: int,
+        pan_y: int,
+        zoom_x: int,
+        zoom_y: int
+    }
+    */
+    public async save_local_storage(): Promise<void> {
+        //
+        //Get whatever was in the local storage
+        const db_init: string | null = this.win.localStorage.getItem('db_init');
+        //
+        //Get all hidden entities
+        const hidden: Array<string> = this.get_hidden();
+        //
+        //Organize and stringify that information
+        const info: info = {
+            hidden: hidden,
+            pan_x: this.panx,
+            pan_y: this.pany,
+            zoom_x: this.zoomx,
+            zoom_y: this.zoomy,
+        };
+        //
+        //Get the db name
+        const dbname: string = this.dbase.name;
+        //
+        //If there is no initial db initialization settings
+        if (!db_init) {
+            //
+            //Variable to hold database settings
+            const setting: init = {};
+            //
+            //Compile the database settings
+            setting[dbname] = info;
+            //
+            //Save the settings in the local storage
+            this.win.localStorage.setItem(database.key, JSON.stringify(setting));
+        } else {
+            //
+            //parse what was in the local storage
+            const db_settings: init = JSON.parse(db_init);
+            //
+            //add the new settings
+            db_settings[dbname] = info;
+            //
+            //Convert the db_settings into a string and save
+            this.win.localStorage.setItem(database.key, JSON.stringify(db_settings));
+        }
+    }
+    //
+    //Get all the hidden entities
+    private get_hidden(): Array<string> {
+        //
+        //Create an array to hold the hidden entities
+        const hidden: Array<string> = [];
+        //
+        //Go through all the entities of the database
+        Object.values(this.entities).forEach((entity) => {
+            //
+            //Look for hidden class
+            if (!entity.proxy.classList.contains('hidden')) return;
+            //
+            //We now are aware that the element is hidden so add it to the hidden collection
+            hidden.push(entity.name);
+        });
+        //
+        //Return hidden entities
+        return hidden;
+    }
+    //
     //Collect all the label layouts needed for saving the status of the this
     //database
     *collect_labels(): Generator<label> {
@@ -533,7 +1093,7 @@ export class database extends schema.database {
         //Draw the entities
         for (const ename in this.entities) this.entities[ename].draw();
         //
-        //Draw the relationship asociatd with this entity.
+        //Draw the relationship asociated with this entity.
         this.relations.forEach((Relation) => Relation.draw());
     }
 
@@ -559,7 +1119,8 @@ export class database extends schema.database {
             'database',
             [this.meta_dbname],
             'get_sql_data',
-            [sql]
+            [sql],
+            this.cwd
         );
         //
         //Use the result to set the x and y coordinates for the matching entity
@@ -612,7 +1173,6 @@ export class database extends schema.database {
             }
         }
     }
-
     //
     //Move the selected entity to the double-clicked position
     entity_move(ev: MouseEvent): void {
@@ -639,7 +1199,6 @@ export class database extends schema.database {
         //Effect the move (without redrawing the entity)
         entity.move();
     }
-
     //
     //Get the coordinates of the double-clicked position (in real units), given
     //the event generated by the event.
@@ -673,7 +1232,7 @@ export class database extends schema.database {
         return point_new;
     }
 }
-
+//
 //The components of an entity
 type component = {
     //
@@ -682,6 +1241,9 @@ type component = {
     //
     //The name of the entity
     text: SVGTextElement;
+    //
+    //The number of records in a given entity
+    record_count: SVGTextElement;
     //
     //The attributes sub-components
     attributes: {
@@ -700,6 +1262,12 @@ type component = {
 //The entity in the meta-visuo namespace is an extension of the schema version
 export class entity extends schema.entity {
     //
+    //The maximum length of an entity
+    public static maximum_name_size: number = 12;
+    //
+    //The count of records in the entity
+    public count: number | undefined = undefined;
+    //
     //The position of this entity in the e-a-r drawing
     public position: DOMPoint;
     //
@@ -709,15 +1277,12 @@ export class entity extends schema.entity {
     //The (slanting) angle of the attributes
     angle: number = 0;
     //
-    //The visual dimension of this entity
-    proxy: SVGGraphicsElement;
-    //
     //The attributes of this entity
     attributes: Array<attribute>;
     //
     //The place holder for collected relations connected to this entity. N.B.
     //Relations cannot be determined when an entity is being constructted.
-    private __relations?: Array<relation>;
+    public __relations?: Array<relation>;
     //
     //The components of an entity
     public component: component;
@@ -729,7 +1294,14 @@ export class entity extends schema.entity {
     get y(): number {
         return this.position.y;
     }
-
+    //
+    //Change the proxy data type to svg element
+    public get proxy(): SVGGraphicsElement {
+        return <SVGGraphicsElement>super.proxy;
+    }
+    public set proxy(p: SVGGraphicsElement) {
+        super.proxy = p;
+    }
     //
     constructor(
         //
@@ -784,8 +1356,33 @@ export class entity extends schema.entity {
         //selection is  removed from any other entity that is selected and this
         //one
         this.proxy.onclick = () => this.select();
+        //
+        //Add the name size error to the entity
+        this.add_name_size_error();
+        //
+        //If there are errors in this  entity mark it as such
+        if (this.errors.length > 0) this.proxy.classList.add('error');
     }
-
+    //
+    //Check the size of the entity name and report an error if it is longer than
+    //maximum_name_size. Why 12? It is the length of the word contribution which
+    //is about the longest name we should allow, the shorter the better.
+    public add_name_size_error(): void {
+        //
+        //Determine the size of the name attribute
+        const size: number = this.name.length;
+        //
+        //If the size is greater than maximum_name_size, we add the error to those
+        //of this entity
+        if (size <= entity.maximum_name_size) return;
+        //
+        //At this point the size is greater than 12.Compile and save the error
+        const error = new Error(`Entity name size is '${size}' characters which is longer than 10`);
+        //
+        //Save the error
+        this.errors.push(error);
+    }
+    //
     //The relations of this entity are those that have it --this entity--as
     //its both the source and the destination.
     *collect_relations(): Generator<relation> {
@@ -793,7 +1390,7 @@ export class entity extends schema.entity {
         //Visit all the relations of this database
         for (const relation of this.dbase.relations) yield* this.collect_relation(relation);
     }
-
+    //
     //Returns the relations of this entity. They are constructed only once.
     get relations(): Array<relation> {
         //
@@ -805,7 +1402,7 @@ export class entity extends schema.entity {
         //
         return this.__relations;
     }
-
+    //
     //Collect the given relation if this entity is either its source or its
     //destination
     *collect_relation(relation: relation): Generator<relation> {
@@ -816,7 +1413,7 @@ export class entity extends schema.entity {
         //Collect the given relation if this entity is its destination
         if (relation.dest === this) yield relation;
     }
-
+    //
     //Collect the attributes of this entity
     *collect_attributes(): Generator<attribute> {
         //
@@ -840,13 +1437,14 @@ export class entity extends schema.entity {
             }
         }
     }
-
+    //
     //Draw this entity as a circle with its attributes slanted at some angle.
     //This is the arrange layout of the tags:-
     /*
     <g class="entity">....the proxy element
         <circle radius/>
         <text/>
+        <text class = "record_count"/> - contins the number of records in the particular entity
 
         <!-- The attributes subsytem -->
         <g class="rotatable">
@@ -875,6 +1473,9 @@ export class entity extends schema.entity {
         //Attach the text to the proxy
         this.proxy.appendChild(text);
         //
+        //Create the text element that will hold the number of records in each entity
+        const record_count = this.record_count();
+        //
         // Center the text at at its (mvable) position
         text.setAttribute('text-anchor', 'middle');
         text.textContent = `${this.name}`;
@@ -882,9 +1483,24 @@ export class entity extends schema.entity {
         //Draw the attributes sub-system of this entity
         const attributes = this.draw_attributes();
         //
-        return { circle, text, attributes };
+        //Retrun the components of the attribute
+        return { circle, text, attributes, record_count };
     }
-
+    //
+    //Addition of the count of records that each entity has
+    private record_count(): SVGTextElement {
+        //
+        // Create the text element to represent the number of records the entity has
+        const text = document.createElementNS(svgns, 'text');
+        //
+        //Attach the text to the proxy
+        this.proxy.appendChild(text);
+        //
+        // Center the text at at its (movable) position
+        text.setAttribute('text-anchor', 'middle');
+        //
+        return text;
+    }
     //
     // Draw the rotatable attributes sub-system . It is organized as follows:-
     /*
@@ -952,12 +1568,15 @@ export class entity extends schema.entity {
     //-the components that make up this entoty
     //-the attrobutes of this entoty
     //-the relations attached to this entity
-    move(): void {
+    async move(): Promise<void> {
         //
         //1. Move the components that make up this entity to the new position
         //
         //Destructure the componets
-        const { circle, text, attributes } = this.component;
+        const { circle, text, attributes, record_count } = this.component;
+        //
+        //Add the record count by geting the count of records in the particular entity
+        await this.display_count(record_count);
         //
         //Move the circle to this entity's position
         circle.setAttribute('cx', `${this.position.x}`);
@@ -966,6 +1585,10 @@ export class entity extends schema.entity {
         //Move the labeling text to this enties position
         text.setAttribute('x', `${this.position.x}`);
         text.setAttribute('y', `${this.position.y}`);
+        //
+        //Move the record count text to this enties position
+        record_count.setAttribute('x', `${this.position.x}`);
+        record_count.setAttribute('y', `${this.position.y + 2}`);
         //
         //Destructure the attributes component to reveal the rotable and polyline
         //elements
@@ -996,16 +1619,54 @@ export class entity extends schema.entity {
         //strat or end at this entities new position
         this.relations.forEach((relation) => relation.move());
     }
-
+    //
+    //Query the database to get the count of records in the entity then display the results in the
+    //given svg element
+    private async display_count(count: SVGTextElement): Promise<void> {
+        //
+        //Get the record count for the particular entity by querying the entity
+        this.count = this.count ? this.count : await this.get_count();
+        //
+        //Display the number of records for the particular entity
+        count.textContent = `${this.count}`;
+    }
+    //
+    //Get the number of recors for the given entity by quering the entity with the help of the server]
+    //excec method
+    private async get_count(): Promise<number> {
+        //
+        //Formulate the sql query
+        const sql: string = `
+            select 
+                count(*) as count 
+            from 
+                \`${this.name}\`
+        `;
+        //
+        //Execute the query on the server and return the result
+        const result: Array<{ count: number }> = await exec(
+            'database',
+            [this.dbase.name, false],
+            'get_sql_data',
+            [sql]
+        );
+        //
+        return result[0].count;
+    }
+    //
+    //Returns the top left position of this entity
     //
     //Mark this entity as selected
-    select() {
+    select(): void {
         //
         //Get the entity that was previously selected
         const previous: HTMLElement | null = this.dbase.proxy.querySelector('.selected');
         //
         //If there is any, deselect it
         if (previous) previous.classList.remove('selected');
+        //
+        //Do not add the selected if the previously selected entity was the one that was clicked
+        if (previous?.isEqualNode(this.proxy)) return;
         //
         //Mark the proxy of this entity as selected
         this.proxy.classList.add('selected');
@@ -1026,7 +1687,8 @@ export class attribute extends schema.column {
     //attribute
     public index: number = -1;
     //
-    public proxy: SVGTextElement;
+    //Text elements that hold metadata of the attribute(comments and data types)
+    public meta: metadata;
     //
     //Note how we  have generalized teh definition of a visual attrobute beyond
     //that of s schema, so that we can regard foreign keys that reference a
@@ -1043,10 +1705,83 @@ export class attribute extends schema.column {
         //underlying entity
         entity.component.attributes.margin.appendChild(this.proxy);
         //
+        //Add the comments and datatype to the attribute
+        this.meta = this.append_metadata();
+        //
         //Draw the attribute
         this.show();
     }
-
+    //
+    //This method is responsible for adding attribute metadata. The metadata might be a comment or
+    //the datatype to help programmers understand how to work with data from the given attribute
+    //The datatype will be separated using a ':' (Pascal notation) while the comment of the
+    //attribute will be demacated by a //
+    //In the case of varchar we also need to indicate the length that the attribute can accomodate
+    private append_metadata(): metadata {
+        //
+        //Create a variable to hold the result
+        const meta: metadata = {};
+        //
+        //Add The comment to the
+        if (this.comment) {
+            //
+            //Create a text element for showing the comment
+            const comment: SVGTextElement = this.create_metadata(`// ${this.comment}`, 'comment');
+            //
+            //Append the comment to the page
+            this.entity.component.attributes.margin.appendChild(comment);
+            //
+            //Append the comments element to the meta
+            meta.comments = comment;
+        }
+        //
+        //The length of characters to be taken
+        //In the case of a varchar get the length of characters that the attribute can accomodate
+        const length: string = this.data_type === 'varchar' ? `(${this.length})` : '';
+        //
+        //Ensure that  the attribute datatype is present before displaying
+        if (this.data_type) {
+            //
+            //Create a text element to display the datatype
+            const dtype: SVGTextElement = this.create_metadata(
+                `:${this.data_type} ${length} `,
+                'data_type'
+            );
+            //
+            //Append the text element to the page
+            this.entity.component.attributes.margin.appendChild(dtype);
+            //
+            //Append the data type element to the meta
+            meta.data_types = dtype;
+        }
+        //
+        //Return the comments and data type text element if any were created
+        return meta;
+    }
+    //
+    //This method will display the given text content on a specified position in a svg text element
+    //By default the svg text element is hidden and will only be visible when the relevant button is clicked
+    //We also get an svg text element that we will further append to the relevant section
+    private create_metadata(
+        //
+        //The acctual content to be shown within the text element
+        content: string,
+        //
+        //An identifier of what is to be shown i.e., 'comment' or 'data_type'
+        type: string
+    ): SVGTextElement {
+        //
+        //Create an element to hold the comment
+        const element: SVGTextElement = this.document.createElementNS(svgns, 'text');
+        //
+        //Set the value of the comment
+        element.textContent = content;
+        //
+        //hide the comment by default
+        element.classList.add('hidden', type);
+        //
+        return element;
+    }
     //
     //Show/draw this atttribute, linking it to the margin element of the
     //containing attribute
@@ -1092,15 +1827,31 @@ export class attribute extends schema.column {
             2 * this.index;
         //
         this.proxy.setAttribute('y', String(y));
+        //
+        //Using the length of the name of the attribute determine the appropriate position to place
+        //the comments and data types
+        const len: number = this.name.length < 5 ? 6 : this.name.length < 8 ? 8 : 10;
+        //
+        //Set the position of the comments
+        if (this.meta.comments) {
+            this.meta.comments.setAttribute('x', `${this.entity.position.x + len}`);
+            this.meta.comments.setAttribute('y', `${y}`);
+        }
+        //
+        //Set the position of the data_types
+        if (this.meta.data_types) {
+            this.meta.data_types.setAttribute('x', `${this.entity.position.x + len}`);
+            this.meta.data_types.setAttribute('y', `${y}`);
+        }
     }
 }
 
 //
 //A metavisuo relation is an extension of a schema foreign key column
-class relation extends schema.foreign {
+export class relation extends schema.foreign {
     //
     //The the svg element that represents the visual aspect of this relationship
-    public proxy: SVGElement;
+    //public proxy: SVGElement;
     //
     //The polyline that represents a relation
     public polyline: SVGPolylineElement;
@@ -1108,7 +1859,7 @@ class relation extends schema.foreign {
     //A relation is construcructed using data from a foreign key and metavisuo
     //entity that is its source
     constructor(public col: schema.foreign, public entity: entity) {
-        //
+        //IF the relationship is enforced mark it with enforced class
         super(entity, col.static_data);
         //
         //Combine all errors, those derived ffrom PHP and those from Js
@@ -1125,6 +1876,9 @@ class relation extends schema.foreign {
         //The class that will style the lines showing the relations.
         this.proxy.classList.add('relation');
         //
+        //For enforced relationships mark them with the enforced class
+        if (col.delete_rule === 'RESTRICT') this.proxy.classList.add('enforced');
+        //
         //If there are errors in this relation, then mark it as such
         if (this.errors.length > 0) this.proxy.classList.add('error');
         //
@@ -1132,7 +1886,6 @@ class relation extends schema.foreign {
         //later)
         this.polyline = this.draw();
     }
-
     //
     //Get the source and destination entities of this relation
     get src(): entity {

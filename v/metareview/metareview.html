@@ -37,10 +37,16 @@
             <button id="save">save</button>
             <button id="comments">Comments</button>
             <button id="data_types">DataTypes</button>
-            <button id="hide">Hide</button>
+            <button onclick="page.hide()">Hide</button>
+            <button id="show">Show</button>
+            <div>
+                <button onclick="page.show_errors()">Show Errors</button>
+                <div id="report"></div>
+            </div>
         </div>
         <!--
         The content section-->
         <div id="content"></div>
+        <div id="entities"></div>
     </body>
 </html>

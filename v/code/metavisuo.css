@@ -75,7 +75,7 @@ The attribute's' backbone
 The markers for the attributes backbone. THIS IS NOT WORKING*/
 
 marker {
-    stroke: black;
+    stroke: rgb(0, 0, 0);
     stroke-width: 2;
 }
 
@@ -87,4 +87,43 @@ marker {
 /* Hide and unhide content in the page */
 .hidden {
     display: none;
+}
+
+/* Change the font color of all the comments and datatypes */
+.comment,
+.data_type {
+    fill: rgb(79, 252, 5);
+    stroke-width: 0;
+    stroke: currentColor;
+}
+
+/* 
+Adjust the sizing,color and positioning of the entities side pannel 
+Also make the side pannel hidden 
+*/
+#entities {
+    width: 250px;
+    height: 89%;
+    background-color: lightgray;
+    overflow: scroll;
+    position: fixed;
+    right: -250px; /* Initially hide it off the screen */
+    bottom: 0;
+    transition: right 0.5s ease; /* Smooth transition for sliding effect */
+}
+
+/* Show the side pannel contating the list of entities */
+#entities.show {
+    right: 0; /* Move the panel in when shown */
+}
+
+/* Make the entitites checkbox display only one at a time */
+.entity_checkbox {
+    display: block;
+}
+
+/* Mark all enforced relationships pink  */
+.enforced > polyline,
+.enforced > marker {
+    stroke: #fc08e8;
 }

@@ -1,7 +1,0 @@
-{
-    "url": "http:\/\/localhost\/tracker\/v\/code\/index.php",
-    "class": "database",
-    "cargs": "[\"mutallco_rental\"]",
-    "method": "export_structure",
-    "margs": "[]"
-}
